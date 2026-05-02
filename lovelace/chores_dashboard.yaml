@@ -1,0 +1,58 @@
+# Add this as a new dashboard in HA (Raw config editor) or reference via !include.
+# The colored borders require the card-mod HACS integration.
+# Without card-mod the cards still work, just without colors.
+
+title: Chores
+views:
+  - title: Today
+    icon: mdi:broom
+    cards:
+      - type: grid
+        columns: 2
+        cards:
+          - type: todo-list
+            entity: todo.chores_dad
+            title: Dad
+            card_mod:
+              style: |
+                ha-card { border-top: 4px solid #3498db; }
+
+          - type: todo-list
+            entity: todo.chores_mom
+            title: Mom
+            card_mod:
+              style: |
+                ha-card { border-top: 4px solid #e91e63; }
+
+          - type: todo-list
+            entity: todo.chores_kid1
+            title: Kid 1
+            card_mod:
+              style: |
+                ha-card { border-top: 4px solid #2ecc71; }
+
+          - type: todo-list
+            entity: todo.chores_kid2
+            title: Kid 2
+            card_mod:
+              style: |
+                ha-card { border-top: 4px solid #f39c12; }
+
+      - type: entities
+        title: Add a Chore
+        entities:
+          - entity: input_text.new_chore_name
+            name: Name
+          - entity: input_number.new_chore_duration
+            name: Duration (min)
+          - entity: input_select.new_chore_frequency
+            name: Frequency
+          - entity: input_boolean.new_chore_kids_ok
+            name: Kids can do this
+
+      - type: button
+        name: Add Chore
+        icon: mdi:plus-circle-outline
+        tap_action:
+          action: call-service
+          service: script.add_chore

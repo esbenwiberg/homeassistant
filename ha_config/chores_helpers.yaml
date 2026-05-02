@@ -1,0 +1,57 @@
+# Paste these blocks into the relevant sections of your configuration.yaml,
+# or use separate files via !include_dir_merge_named.
+
+# ── input_text ────────────────────────────────────────────────────────────────
+input_text:
+  new_chore_name:
+    name: Chore name
+    max: 60
+
+# ── input_number ──────────────────────────────────────────────────────────────
+input_number:
+  new_chore_duration:
+    name: Duration
+    min: 5
+    max: 240
+    step: 5
+    unit_of_measurement: min
+    initial: 30
+
+# ── input_select ──────────────────────────────────────────────────────────────
+input_select:
+  new_chore_frequency:
+    name: Frequency
+    options:
+      - daily
+      - weekly
+      - biweekly
+      - monthly
+      - quarterly
+      - yearly
+    initial: weekly
+
+# ── input_boolean ─────────────────────────────────────────────────────────────
+input_boolean:
+  new_chore_kids_ok:
+    name: Kids can do this
+    initial: false
+
+# ── script ────────────────────────────────────────────────────────────────────
+script:
+  add_chore:
+    alias: Add Chore
+    sequence:
+      - event: chore_add
+        event_data:
+          name: "{{ states('input_text.new_chore_name') }}"
+          duration: "{{ states('input_number.new_chore_duration') | int }}"
+          frequency: "{{ states('input_select.new_chore_frequency') }}"
+          kids_ok: "{{ states('input_boolean.new_chore_kids_ok') }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.new_chore_name
+        data:
+          value: ""
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.new_chore_kids_ok

@@ -1,0 +1,80 @@
+chores:
+  - id: vacuum_living_room
+    name: Vacuum living room
+    duration: 20
+    frequency: weekly
+    kids_ok: true
+    assigned_to: null
+    last_completed: null
+    skipped_count: 0
+    next_due: null
+
+  - id: clean_bathroom
+    name: Clean bathroom
+    duration: 30
+    frequency: weekly
+    kids_ok: false
+    assigned_to: null
+    last_completed: null
+    skipped_count: 0
+    next_due: null
+
+  - id: mop_floors
+    name: Mop floors
+    duration: 25
+    frequency: biweekly
+    kids_ok: true
+    assigned_to: null
+    last_completed: null
+    skipped_count: 0
+    next_due: null
+
+  - id: clean_oven
+    name: Clean oven
+    duration: 45
+    frequency: monthly
+    kids_ok: false
+    assigned_to: null
+    last_completed: null
+    skipped_count: 0
+    next_due: null
+
+  - id: deep_clean_fridge
+    name: Deep clean fridge
+    duration: 40
+    frequency: monthly
+    kids_ok: false
+    assigned_to: null
+    last_completed: null
+    skipped_count: 0
+    next_due: null
+
+  - id: wash_windows
+    name: Wash windows
+    duration: 60
+    frequency: quarterly
+    kids_ok: true
+    assigned_to: null
+    last_completed: null
+    skipped_count: 0
+    next_due: null
+
+  - id: clean_behind_furniture
+    name: Clean behind furniture
+    duration: 45
+    frequency: quarterly
+    kids_ok: false
+    assigned_to: null
+    last_completed: null
+    skipped_count: 0
+    next_due: null
+
+  - id: descale_appliances
+    name: Descale appliances
+    duration: 30
+    frequency: yearly
+    kids_ok: false
+    assigned_to: null
+    last_completed: null
+    skipped_count: 0
+    next_due: null
