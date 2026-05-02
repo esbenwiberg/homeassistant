@@ -20,15 +20,21 @@ class ChoreManager(hass.Hass):
 
     def initialize(self):
         self.chores_file = Path(self.args["chores_file"])
-        self.todo_entity = self.args.get("todo_entity", "todo.chores")
-        self.notify_service = self.args.get("notify_service", "notify/notify")
+        self.family = self.args.get("family", [])
+        self.global_notify = self.args.get("notify_service", "notify/notify")
         self.claude = anthropic.Anthropic(api_key=self.args["claude_api_key"])
 
         self.run_daily(self.daily_refresh, self.args.get("refresh_time", "07:00:00"))
-        self.listen_state(self.on_todo_change, self.todo_entity, attribute="all")
-        self.listen_event(self.on_add_chore, "chore_add")
 
-        # Delay initial run so HA is fully started
+        for member in self.family:
+            self.listen_state(
+                self.on_todo_change,
+                member["todo_entity"],
+                attribute="all",
+                member=member,
+            )
+
+        self.listen_event(self.on_add_chore, "chore_add")
         self.run_in(lambda _: self.recalculate_and_sync(), 10)
 
     # ── Data ──────────────────────────────────────────────────────────────────
@@ -56,17 +62,22 @@ class ChoreManager(hass.Hass):
             next_due = last + timedelta(days=freq_days)
         else:
             next_due = date.today()
-        # Forgiving: if overdue, schedule from today
         return max(next_due, date.today())
 
     def schedule_with_claude(self, chores):
         today = date.today()
+
+        family_lines = "\n".join(
+            f"- {m['name']} ({'can do all chores' if m.get('role') == 'adult' else 'kids_ok chores only'})"
+            for m in self.family
+        )
         chore_list = [
             {
                 "id": c["id"],
                 "name": c["name"],
                 "duration_min": c["duration"],
                 "frequency": c["frequency"],
+                "kids_ok": c.get("kids_ok", False),
                 "earliest_date": self.baseline_next_due(c).isoformat(),
             }
             for c in chores
@@ -74,18 +85,25 @@ class ChoreManager(hass.Hass):
 
         prompt = f"""Today is {today.isoformat()} ({today.strftime('%A')}).
 
-Schedule these household chores. Each chore recurs at its stated frequency — give me the next scheduled date for each one.
+Schedule household chores and assign each to a family member.
 
+Family:
+{family_lines}
+
+Chores:
 {json.dumps(chore_list, indent=2)}
 
 Rules:
 - Schedule each chore ON or AFTER its earliest_date (never earlier)
-- Max 2 chores per day, max 60 combined minutes per day
+- Assign each chore to exactly one family member
+- Kids can only be assigned chores where kids_ok is true
+- Aim for each person to have roughly one chore per day
+- Max 2 chores / 60 combined minutes per person per day
 - Prefer chores over 30min on Saturdays/Sundays
-- Spread chores out — avoid clustering
+- Distribute load fairly between adults
 
 Return ONLY a JSON array, no prose:
-[{{"id": "chore_id", "next_due": "YYYY-MM-DD"}}, ...]"""
+[{{"id": "chore_id", "next_due": "YYYY-MM-DD", "assigned_to": "Name"}}, ...]"""
 
         resp = self.claude.messages.create(
             model="claude-sonnet-4-6",
@@ -96,7 +114,13 @@ Return ONLY a JSON array, no prose:
         raw = resp.content[0].text.strip()
         match = re.search(r"\[.*\]", raw, re.DOTALL)
         parsed = json.loads(match.group(0) if match else raw)
-        return {item["id"]: item["next_due"] for item in parsed}
+        return {
+            item["id"]: {
+                "next_due": item["next_due"],
+                "assigned_to": item.get("assigned_to"),
+            }
+            for item in parsed
+        }
 
     def recalculate_and_sync(self):
         chores = self.load_chores()
@@ -107,11 +131,16 @@ Return ONLY a JSON array, no prose:
             schedule = self.schedule_with_claude(chores)
             for chore in chores:
                 if chore["id"] in schedule:
-                    chore["next_due"] = schedule[chore["id"]]
+                    chore["next_due"] = schedule[chore["id"]]["next_due"]
+                    chore["assigned_to"] = schedule[chore["id"]]["assigned_to"]
         except Exception as e:
             self.log(f"Claude scheduling failed, falling back to baseline: {e}", level="WARNING")
-            for chore in chores:
+            adults = [m for m in self.family if m.get("role") == "adult"]
+            fallback_members = adults or self.family
+            for i, chore in enumerate(chores):
                 chore["next_due"] = self.baseline_next_due(chore).isoformat()
+                if not chore.get("assigned_to"):
+                    chore["assigned_to"] = fallback_members[i % len(fallback_members)]["name"]
 
         self.save_chores(chores)
         self.sync_todo_list(chores)
@@ -120,31 +149,37 @@ Return ONLY a JSON array, no prose:
 
     def sync_todo_list(self, chores):
         today = date.today().isoformat()
-        todays_chores = [c for c in chores if c.get("next_due") == today]
+        member_entity = {m["name"]: m["todo_entity"] for m in self.family}
 
-        existing_items = self.get_state(self.todo_entity, attribute="items") or []
-        existing_names = {
-            item["summary"]
-            for item in existing_items
-            if item.get("status") != "completed"
-        }
+        existing_per_entity = {}
+        for member in self.family:
+            items = self.get_state(member["todo_entity"], attribute="items") or []
+            existing_per_entity[member["todo_entity"]] = {
+                item["summary"]
+                for item in items
+                if item.get("status") != "completed"
+            }
+            for item in items:
+                if item.get("status") == "completed":
+                    self.call_service(
+                        "todo/remove_item",
+                        entity_id=member["todo_entity"],
+                        item=item["summary"],
+                    )
 
-        for chore in todays_chores:
-            if chore["name"] not in existing_names:
+        for chore in chores:
+            if chore.get("next_due") != today:
+                continue
+            assigned = chore.get("assigned_to")
+            if not assigned or assigned not in member_entity:
+                continue
+            entity = member_entity[assigned]
+            if chore["name"] not in existing_per_entity.get(entity, set()):
                 self.call_service(
                     "todo/add_item",
-                    entity_id=self.todo_entity,
+                    entity_id=entity,
                     item=chore["name"],
                     description=f"{chore['duration']}min · {chore['frequency']}",
-                )
-
-        # Clean up completed items from previous days
-        for item in existing_items:
-            if item.get("status") == "completed":
-                self.call_service(
-                    "todo/remove_item",
-                    entity_id=self.todo_entity,
-                    item=item["summary"],
                 )
 
     # ── Tick-off detection ────────────────────────────────────────────────────
@@ -162,12 +197,13 @@ Return ONLY a JSON array, no prose:
             for i in ((new.get("attributes") or {}).get("items") or [])
         }
 
+        member = kwargs.get("member", {})
         for name, status in new_items.items():
             if status == "completed" and old_items.get(name) != "completed":
-                self.log(f"Chore ticked off: {name}")
-                self.on_chore_completed(name)
+                self.log(f"{member.get('name', '?')} completed: {name}")
+                self.on_chore_completed(name, member)
 
-    def on_chore_completed(self, chore_name):
+    def on_chore_completed(self, chore_name, member):
         chores = self.load_chores()
         today = date.today().isoformat()
 
@@ -178,9 +214,10 @@ Return ONLY a JSON array, no prose:
                 chore["skipped_count"] = 0
                 self.save_chores(chores)
 
-                peptalk = self.get_peptalk(chore, skipped)
+                peptalk = self.get_peptalk(chore, member.get("name", "You"), skipped)
+                notify = member.get("notify_service") or self.global_notify
                 self.call_service(
-                    self.notify_service,
+                    notify,
                     title=f"Done: {chore_name}",
                     message=peptalk,
                 )
@@ -202,6 +239,8 @@ Return ONLY a JSON array, no prose:
             "name": data["name"].strip(),
             "duration": int(data.get("duration", 30)),
             "frequency": data.get("frequency", "weekly"),
+            "kids_ok": str(data.get("kids_ok", "false")).lower() == "true",
+            "assigned_to": None,
             "last_completed": None,
             "skipped_count": 0,
             "next_due": None,
@@ -213,16 +252,16 @@ Return ONLY a JSON array, no prose:
 
     # ── Peptalk ───────────────────────────────────────────────────────────────
 
-    def get_peptalk(self, chore, skipped_count):
+    def get_peptalk(self, chore, person_name, skipped_count):
         context = (
             f"skipped {skipped_count} time(s) before finally doing it"
             if skipped_count > 0
             else "done right on schedule"
         )
         prompt = (
-            f'The user just finished "{chore["name"]}" '
+            f'{person_name} just finished "{chore["name"]}" '
             f'({chore["duration"]}min, {chore["frequency"]}, {context}). '
-            f"Give a short, fun, specific peptalk — 1 sentence max. No emojis."
+            f"Give a short, fun, specific peptalk addressed to {person_name} — 1 sentence max. No emojis."
         )
 
         try:
@@ -234,7 +273,7 @@ Return ONLY a JSON array, no prose:
             return resp.content[0].text.strip()
         except Exception as e:
             self.log(f"Peptalk request failed: {e}", level="WARNING")
-            return "Nailed it — one less thing to think about."
+            return f"Nailed it, {person_name} — one less thing to think about."
 
     def daily_refresh(self, kwargs):
         self.recalculate_and_sync()

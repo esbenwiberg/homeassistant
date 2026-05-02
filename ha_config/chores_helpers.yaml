@@ -30,6 +30,12 @@ input_select:
       - yearly
     initial: weekly
 
+# ── input_boolean ─────────────────────────────────────────────────────────────
+input_boolean:
+  new_chore_kids_ok:
+    name: Kids can do this
+    initial: false
+
 # ── script ────────────────────────────────────────────────────────────────────
 script:
   add_chore:
@@ -40,8 +46,12 @@ script:
           name: "{{ states('input_text.new_chore_name') }}"
           duration: "{{ states('input_number.new_chore_duration') | int }}"
           frequency: "{{ states('input_select.new_chore_frequency') }}"
+          kids_ok: "{{ states('input_boolean.new_chore_kids_ok') }}"
       - service: input_text.set_value
         target:
           entity_id: input_text.new_chore_name
         data:
           value: ""
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.new_chore_kids_ok

@@ -1,14 +1,29 @@
 chore_manager:
   module: chore_manager
   class: ChoreManager
-  # Absolute path to chores.yaml — adjust to match where your repo is mounted.
-  # In a typical HA setup with the AppDaemon add-on this is usually under /config.
+  # Absolute path accessible from the AppDaemon container (typically /config/...)
   chores_file: /config/homeassistant/chores/chores.yaml
-  # A local_todo entity — create it in HA under Settings > Devices > To-do lists
-  todo_entity: todo.chores
-  # Your phone's notification service, e.g. notify/mobile_app_my_phone
-  notify_service: notify/mobile_app_your_phone
-  # Time to recalculate and populate today's chores
+  # Time to recalculate and populate each person's todo list
   refresh_time: "07:00:00"
   # Store your key in appdaemon/secrets.yaml as: claude_api_key: sk-ant-...
   claude_api_key: !secret claude_api_key
+  # Fallback notification if a member has no notify_service set
+  notify_service: notify/notify
+  # Each member needs a local_todo entity created in HA:
+  #   Settings > Devices & Services > Add Integration > Local To-do
+  # role: adult = all chores, kid = kids_ok chores only
+  family:
+    - name: Dad
+      role: adult
+      todo_entity: todo.chores_dad
+      notify_service: notify/mobile_app_dads_phone
+    - name: Mom
+      role: adult
+      todo_entity: todo.chores_mom
+      notify_service: notify/mobile_app_moms_phone
+    - name: Kid 1
+      role: kid
+      todo_entity: todo.chores_kid1
+    - name: Kid 2
+      role: kid
+      todo_entity: todo.chores_kid2
