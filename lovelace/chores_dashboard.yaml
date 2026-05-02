@@ -1,0 +1,28 @@
+# Add this as a new dashboard view in HA (Raw config editor)
+# or reference it from your main lovelace config via !include
+
+title: Chores
+views:
+  - title: Today
+    icon: mdi:broom
+    cards:
+      - type: todo-list
+        entity: todo.chores
+        title: Today's Chores
+
+      - type: entities
+        title: Add a Chore
+        entities:
+          - entity: input_text.new_chore_name
+            name: Name
+          - entity: input_number.new_chore_duration
+            name: Duration (min)
+          - entity: input_select.new_chore_frequency
+            name: Frequency
+
+      - type: button
+        name: Add Chore
+        icon: mdi:plus-circle-outline
+        tap_action:
+          action: call-service
+          service: script.add_chore

@@ -1,0 +1,47 @@
+# Paste these blocks into the relevant sections of your configuration.yaml,
+# or use separate files via !include_dir_merge_named.
+
+# ── input_text ────────────────────────────────────────────────────────────────
+input_text:
+  new_chore_name:
+    name: Chore name
+    max: 60
+
+# ── input_number ──────────────────────────────────────────────────────────────
+input_number:
+  new_chore_duration:
+    name: Duration
+    min: 5
+    max: 240
+    step: 5
+    unit_of_measurement: min
+    initial: 30
+
+# ── input_select ──────────────────────────────────────────────────────────────
+input_select:
+  new_chore_frequency:
+    name: Frequency
+    options:
+      - daily
+      - weekly
+      - biweekly
+      - monthly
+      - quarterly
+      - yearly
+    initial: weekly
+
+# ── script ────────────────────────────────────────────────────────────────────
+script:
+  add_chore:
+    alias: Add Chore
+    sequence:
+      - event: chore_add
+        event_data:
+          name: "{{ states('input_text.new_chore_name') }}"
+          duration: "{{ states('input_number.new_chore_duration') | int }}"
+          frequency: "{{ states('input_select.new_chore_frequency') }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.new_chore_name
+        data:
+          value: ""

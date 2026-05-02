@@ -1,0 +1,64 @@
+chores:
+  - id: vacuum_living_room
+    name: Vacuum living room
+    duration: 20
+    frequency: weekly
+    last_completed: null
+    skipped_count: 0
+    next_due: null
+
+  - id: clean_bathroom
+    name: Clean bathroom
+    duration: 30
+    frequency: weekly
+    last_completed: null
+    skipped_count: 0
+    next_due: null
+
+  - id: mop_floors
+    name: Mop floors
+    duration: 25
+    frequency: biweekly
+    last_completed: null
+    skipped_count: 0
+    next_due: null
+
+  - id: clean_oven
+    name: Clean oven
+    duration: 45
+    frequency: monthly
+    last_completed: null
+    skipped_count: 0
+    next_due: null
+
+  - id: deep_clean_fridge
+    name: Deep clean fridge
+    duration: 40
+    frequency: monthly
+    last_completed: null
+    skipped_count: 0
+    next_due: null
+
+  - id: wash_windows
+    name: Wash windows
+    duration: 60
+    frequency: quarterly
+    last_completed: null
+    skipped_count: 0
+    next_due: null
+
+  - id: clean_behind_furniture
+    name: Clean behind furniture
+    duration: 45
+    frequency: quarterly
+    last_completed: null
+    skipped_count: 0
+    next_due: null
+
+  - id: descale_appliances
+    name: Descale appliances
+    duration: 30
+    frequency: yearly
+    last_completed: null
+    skipped_count: 0
+    next_due: null

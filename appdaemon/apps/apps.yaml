@@ -1,0 +1,14 @@
+chore_manager:
+  module: chore_manager
+  class: ChoreManager
+  # Absolute path to chores.yaml — adjust to match where your repo is mounted.
+  # In a typical HA setup with the AppDaemon add-on this is usually under /config.
+  chores_file: /config/homeassistant/chores/chores.yaml
+  # A local_todo entity — create it in HA under Settings > Devices > To-do lists
+  todo_entity: todo.chores
+  # Your phone's notification service, e.g. notify/mobile_app_my_phone
+  notify_service: notify/mobile_app_your_phone
+  # Time to recalculate and populate today's chores
+  refresh_time: "07:00:00"
+  # Store your key in appdaemon/secrets.yaml as: claude_api_key: sk-ant-...
+  claude_api_key: !secret claude_api_key

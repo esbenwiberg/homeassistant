@@ -8,16 +8,34 @@ This repository contains custom automations, scripts, and configurations for a H
 
 ## Repository Structure
 
-This repo is in early development. As it grows, expect to find:
+- `chores/chores.yaml` — chore definitions (source of truth, human-editable)
+- `appdaemon/apps/chore_manager.py` — AppDaemon app managing chore scheduling and tick-off
+- `appdaemon/apps/apps.yaml` — AppDaemon app configuration (API keys, entity names)
+- `ha_config/chores_helpers.yaml` — HA input helpers and script for adding chores
+- `lovelace/chores_dashboard.yaml` — Lovelace dashboard for today's chores and adding new ones
 
+As the repo grows, also expect:
 - `automations/` — YAML automation definitions
-- `scripts/` — custom scripts (Python, shell, or YAML)
 - `blueprints/` — reusable automation blueprints
-- `custom_components/` — custom Home Assistant integrations
-- `appdaemon/` — AppDaemon apps (if used)
+- `custom_components/` — custom HA integrations
+
+## Chore Manager
+
+The chore system is an AppDaemon app (`ChoreManager`) backed by `chores/chores.yaml`.
+
+**Data model** — each chore has: `id`, `name`, `duration` (minutes), `frequency` (`daily` / `weekly` / `biweekly` / `monthly` / `quarterly` / `yearly`), `last_completed` (ISO date or null), `skipped_count`, `next_due` (ISO date, derived).
+
+**Scheduling** — on startup and daily at the configured `refresh_time`, the app calls Claude (`claude-sonnet-4-6`) to distribute all chores across the calendar, respecting a max of 2 chores / 60 min per day and preferring heavy chores on weekends. Falls back to a simple `last_completed + frequency_days` baseline if the API call fails.
+
+**Tick-off** — the app watches a `todo.*` HA entity via `listen_state`. When an item flips to `completed`, it updates `last_completed` in the YAML, calls Claude (`claude-haiku-4-5-20251001`) for a one-sentence peptalk, sends a push notification, and recalculates the schedule.
+
+**Adding a chore** — fire the `chore_add` HA event with `name`, `duration`, and `frequency`. The Lovelace dashboard + `script.add_chore` do this from the UI.
+
+**Forgiving scheduling** — if a chore is overdue, `next_due` is set to today (never guilt-stacked into the past).
 
 ## Home Assistant Specifics
 
-- Automations and scripts are written in YAML and follow the [Home Assistant schema](https://www.home-assistant.io/docs/automation/)
-- Custom integrations live under `custom_components/<integration_name>/` and require `manifest.json`, `__init__.py`, and any platform files
 - AppDaemon apps are Python classes extending `appdaemon.plugins.hass.hassapi.Hass`
+- Automations and scripts follow the [Home Assistant schema](https://www.home-assistant.io/docs/automation/)
+- Custom integrations live under `custom_components/<name>/` and require `manifest.json` + `__init__.py`
+- The `chores_file` path in `apps.yaml` must be an absolute path accessible from the AppDaemon container (typically `/config/...`)
